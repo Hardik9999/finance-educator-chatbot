@@ -59,7 +59,7 @@ def load_or_create_db():
         texts = splitter.split_documents(docs)
 
         embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-        vector_db = Chroma.from_documents(texts, embeddings, persist_directory=DB_DIR)
+        vector_db = Chroma.from_documents(texts, embeddings)
         vector_db.persist()
         st.success("✅ Chroma DB created and saved.")
         return vector_db
