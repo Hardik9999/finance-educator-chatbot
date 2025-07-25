@@ -30,14 +30,25 @@ def load_or_create_db():
         embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
         return Chroma(persist_directory=DB_DIR, embedding_function=embeddings)
     else:
+        if not os.path.exists(DATA_DIR) or len(os.listdir(DATA_DIR)) == 0:
+            st.error("❌ The `data/` folder is missing or has no PDF files.")
+            st.stop()
+
         loader = DirectoryLoader(DATA_DIR, glob='*.pdf', loader_cls=PyPDFLoader)
         docs = loader.load()
+
+        if not docs:
+            st.error("❌ No documents found. Please check PDF file validity.")
+            st.stop()
+
         splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         texts = splitter.split_documents(docs)
+
         embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
         vector_db = Chroma.from_documents(texts, embeddings, persist_directory=DB_DIR)
         vector_db.persist()
         return vector_db
+
 
 # === SETUP RETRIEVAL CHAIN ===
 def setup_chain(llm, vector_db):
