@@ -27,35 +27,27 @@ def initialize_llm():
 # === BUILD / LOAD VECTOR DB ===
 @st.cache_resource
 def load_or_create_db():
-    st.info("🔍 Loading finance PDFs and building FAISS index...")
+    st.info("🔍 Loading financial documents...")
 
     if not os.path.exists(DATA_DIR):
-        st.error("❌ 'data/' folder not found.")
+        st.error("❌ 'data/' folder is missing.")
         st.stop()
 
-    pdf_files = [f for f in os.listdir(DATA_DIR) if f.endswith(".pdf")]
-    st.write(f"📄 PDF files: {pdf_files}")
-
-    if len(pdf_files) == 0:
-        st.error("❌ No PDF files found in the 'data/' folder.")
+    pdfs = [f for f in os.listdir(DATA_DIR) if f.endswith(".pdf")]
+    if len(pdfs) == 0:
+        st.error("❌ No PDF files found in the data folder.")
         st.stop()
 
     loader = DirectoryLoader(DATA_DIR, glob='*.pdf', loader_cls=PyPDFLoader)
     docs = loader.load()
-
-    if not docs:
-        st.error("❌ Failed to load PDF content.")
-        st.stop()
-
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     texts = splitter.split_documents(docs)
 
     embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-    vector_db = FAISS.from_documents(texts, embeddings)
+    db = FAISS.from_documents(texts, embeddings)
 
-    st.success("✅ FAISS index created from documents.")
-    return vector_db
-
+    st.success("✅ FAISS DB created in memory.")
+    return db
 
 
 # === SETUP RETRIEVAL CHAIN ===
