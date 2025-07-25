@@ -4,9 +4,10 @@ from langchain_groq import ChatGroq
 from langchain.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
+# from langchain.vectorstores import Chroma
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
+from langchain.vectorstores import FAISS
 
 # === SETTINGS ===
 DATA_DIR = "./data"
@@ -26,43 +27,34 @@ def initialize_llm():
 # === BUILD / LOAD VECTOR DB ===
 @st.cache_resource
 def load_or_create_db():
-    st.info("📂 Checking for vector DB...")
+    st.info("🔍 Loading finance PDFs and building FAISS index...")
 
-    if os.path.exists(DB_DIR):
-        st.success("✅ Found existing Chroma DB.")
-        embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-        return Chroma(persist_directory=DB_DIR, embedding_function=embeddings)
-    else:
-        st.warning("⚠️ No DB found. Attempting to create a new one...")
-        st.write(f"📁 Checking folder: {DATA_DIR}")
-        if not os.path.exists(DATA_DIR):
-            st.error("❌ 'data/' folder not found in the deployed app.")
-            st.stop()
+    if not os.path.exists(DATA_DIR):
+        st.error("❌ 'data/' folder not found.")
+        st.stop()
 
-        pdf_files = [f for f in os.listdir(DATA_DIR) if f.endswith(".pdf")]
-        st.write(f"📄 PDF files found: {pdf_files}")
+    pdf_files = [f for f in os.listdir(DATA_DIR) if f.endswith(".pdf")]
+    st.write(f"📄 PDF files: {pdf_files}")
 
-        if len(pdf_files) == 0:
-            st.error("❌ No PDF files found in the 'data/' folder.")
-            st.stop()
+    if len(pdf_files) == 0:
+        st.error("❌ No PDF files found in the 'data/' folder.")
+        st.stop()
 
-        loader = DirectoryLoader(DATA_DIR, glob="*.pdf", loader_cls=PyPDFLoader)
-        docs = loader.load()
+    loader = DirectoryLoader(DATA_DIR, glob='*.pdf', loader_cls=PyPDFLoader)
+    docs = loader.load()
 
-        if not docs:
-            st.error("❌ Failed to load documents — maybe invalid PDFs?")
-            st.stop()
+    if not docs:
+        st.error("❌ Failed to load PDF content.")
+        st.stop()
 
-        st.success(f"✅ Loaded {len(docs)} documents. Creating DB...")
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    texts = splitter.split_documents(docs)
 
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-        texts = splitter.split_documents(docs)
+    embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
+    vector_db = FAISS.from_documents(texts, embeddings)
 
-        embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-        vector_db = Chroma.from_documents(texts, embeddings)
-        vector_db.persist()
-        st.success("✅ Chroma DB created and saved.")
-        return vector_db
+    st.success("✅ FAISS index created from documents.")
+    return vector_db
 
 
 
